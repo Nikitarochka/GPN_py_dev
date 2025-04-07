@@ -1,0 +1,48 @@
+version: "3.8"
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: web
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  celery:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery_worker
+    command: celery -A app.tasks:celery worker --loglevel=info
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:6-alpine
+    container_name: redis_service
+    ports:
+      - "6379:6379"
+
+  locust:
+    image: locustio/locust
+    container_name: locust_service
+    ports:
+      - "8089:8089"
+    volumes:
+      - .:/mnt/locust
+    working_dir: /mnt/locust
+    command: ["./wait-for-web.sh", "--headless", "-u", "50", "-r", "10", "--run-time", "1m", "--html", "report.html"]
+    depends_on:
+      - web
